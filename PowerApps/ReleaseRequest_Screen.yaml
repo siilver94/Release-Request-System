@@ -1,0 +1,1758 @@
+Screens:
+  ReleaseRequest_Screen:
+    Properties:
+      Fill: =
+      LoadingSpinnerColor: =RGBA(98, 100, 167, 1)
+      OnVisible: |-
+        =// =============================
+        // [릴리즈 상태 요청 시스템] WorkRequest_Screen.OnVisible
+        // 화면 진입 시 1회 실행: 로그인 사용자 정보 조회, 역할 판별, 필터/팝업 상태 초기화
+        // =============================
+
+        // -----------------------------
+        // [1] 로그인 사용자 기본 정보
+        // -----------------------------
+        Set(varMyEmail, Lower(User().Email));
+
+        // UserInfo_DB에서 조직정보 조회
+        Set(
+            varMyInfo,
+            LookUp(UserInfo_DB, Lower('e-mail') = varMyEmail)
+        );
+
+        // 관리자(전체조회) 여부
+        Set(varIsViewer, Lower(varMyEmail) = "eunseong.kim@tym.world");
+
+        // 이름 정제: UserInfo_DB 우선, 없으면 FullName에서 정제
+        Set(varMyNameFromDB, Coalesce(varMyInfo.이름_한글, ""));
+        Set(
+            varMyNameFromFullName,
+            If(
+                IsBlank(Find("(", User().FullName)),
+                Concatenate(
+                    Trim(Right(User().FullName, Len(User().FullName) - Find(" ", User().FullName))),
+                    Trim(Left(User().FullName, Find(" ", User().FullName)))
+                ),
+                Trim(Left(User().FullName, Find("(", User().FullName) - 1))
+            )
+        );
+        Set(varMyName, If(!IsBlank(varMyNameFromDB), varMyNameFromDB, varMyNameFromFullName));
+
+        // 조직 정보 (요청 등록 시 기본값에 사용)
+        Set(varMyDept, Coalesce(varMyInfo.부문, ""));
+        Set(varMyTeam, Coalesce(varMyInfo.팀, ""));
+
+        // -----------------------------
+        // [2] 역할 판별 - DX팀 여부 (App.OnStart의 colDxTeam 기준)
+        // -----------------------------
+        Set(varIsDX, varMyEmail in colDxTeam.DxEmail);
+
+        // -----------------------------
+        // [3] 화면 상태 변수 초기화
+        // -----------------------------
+        Set(varShowRequestPopup, false);
+        Set(varRequestMode, "View");
+        Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+        Set(varShowDeleteConfirmPopup, false);
+
+        // -----------------------------
+        // [4] 필터 기본값
+        // -----------------------------
+        Set(varPeriodFilter, "이번달");
+        Set(varSearchText, "");
+        Set(varOnlyOverdue, false);
+        Set(varDateFrom, DateAdd(Today(), -30, TimeUnit.Days));
+        Set(varDateTo, Now());
+        ClearCollect(colSelectedForce, []);
+
+        // -----------------------------
+        // [5] 토스트 알림
+        // -----------------------------
+        Set(varShowToast, false);
+        Set(varToastMessage, "");
+
+        // -----------------------------
+        // [6] 데이터 새로고침
+        // -----------------------------
+        Refresh(ReleaseRequest_DB);
+        Refresh(UserInfo_DB);
+
+        ClearCollect(colSelectedForce, Filter(ReleaseRequest_DB, false)); // 빈 컬렉션이지만 ReleaseRequest_DB와 동일한 스키마를 가짐
+    Children:
+      - Container1:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            Fill: |-
+              =//RGBA(207, 202, 196, 0.2)
+              RGBA(245, 247, 250, 1)
+            Height: =768
+            Width: =1366
+          Children:
+            - TextCanvas3:
+                Control: Text@0.0.51
+                Properties:
+                  Align: ='TextCanvas.Align'.Start
+                  BorderColor: =RGBA(214, 221, 224, 1)
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =0.5
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Font: =Font.Verdana
+                  FontColor: =RGBA(52, 64, 84, 1)
+                  Height: =28
+                  Text: ="        조회 필터"
+                  VerticalAlign: =VerticalAlign.Middle
+                  Weight: ='TextCanvas.Weight'.Semibold
+                  Width: =126
+                  X: =8
+                  Y: =64
+            - TextCanvas3_1:
+                Control: Text@0.0.51
+                Group: Group1
+                Properties:
+                  BorderColor: =RGBA(214, 221, 224, 1)
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =0.5
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Font: =Font.Verdana
+                  FontColor: =RGBA(52, 64, 84, 1)
+                  Height: =28
+                  Text: ="        작업 목록"
+                  VerticalAlign: =VerticalAlign.Middle
+                  Weight: ='TextCanvas.Weight'.Semibold
+                  Width: =120
+                  X: =293
+                  Y: =64
+            - Icon3_1:
+                Control: Classic/Icon@2.5.0
+                Group: Group1
+                Properties:
+                  BorderColor: =RGBA(0, 0, 0, 0)
+                  Color: =RGBA(53, 61, 63, 1)
+                  DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                  DisabledColor: =RGBA(220, 220, 220, 1)
+                  DisabledFill: =RGBA(0, 0, 0, 0)
+                  Height: =24
+                  HoverBorderColor: =RGBA(0, 0, 0, 0)
+                  HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  HoverFill: =RGBA(0, 0, 0, 0)
+                  Icon: =Icon.OptionsList
+                  PaddingBottom: =3
+                  PaddingLeft: =3
+                  PaddingRight: =3
+                  PaddingTop: =3
+                  PressedBorderColor: =RGBA(0, 0, 0, 0)
+                  PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  PressedFill: =RGBA(0, 0, 0, 0)
+                  Width: =24
+                  X: =300
+                  Y: =66
+            - conDxHeaderTools:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =41
+                  Visible: =varIsDX
+                  Width: =134
+                  X: =1088
+                  Y: =52
+                Children:
+                  - btnBulkForceComplete:
+                      Control: ModernButton@1.0.0
+                      Properties:
+                        Appearance: =ButtonAppearance.Secondary
+                        BorderColor: =RGBA(53, 61, 63, 1)
+                        BorderStyle: =BorderStyle.Solid
+                        BorderThickness: =0.3
+                        Font: =Font.Verdana
+                        Height: =24
+                        OnSelect: |-
+                          =// ForAll이 원본 데이터소스를 직접 순회하며 Patch할 수 없어 임시 컬렉션으로 먼저 떠둠
+                          ClearCollect(
+                              colBulkOverdue,
+                              Filter(
+                                  ReleaseRequest_DB,
+                                  Stage.Value = "진행중",
+                                  SubmittedAt <= DateAdd(Now(), -3, TimeUnit.Days)
+                              )
+                          );
+
+                          ForAll(
+                              colBulkOverdue As req,
+                              Patch(
+                                  ReleaseRequest_DB,
+                                  LookUp(ReleaseRequest_DB, ID = req.ID),
+                                  {
+                                      Stage: {Value: "완료"},
+                                      Status: {Value: "강제완료"},
+                                      CompletedAt: Now(),
+                                      HandlerEmail: varMyEmail
+                                  }
+                              );
+                              Office365Outlook.SendEmailV2(
+                                  req.RequesterEmail,
+                                  "[릴리즈 상태 변경] 강제완료 처리 - " & req.PartNo,
+                                  Concatenate(
+                                      "<div style='font-family:Segoe UI;'>",
+                                      "<h3>강제완료 처리 안내</h3>",
+                                      "<p><b>품번:</b> ", req.PartNo, "</p>",
+                                      "<p>장기간 미확인으로 DX팀에서 일괄 강제완료 처리했습니다.</p>",
+                                      "</div>"
+                                  ),
+                                  {IsHtml: true, Importance: "Normal"}
+                              )
+                          );
+
+                          Clear(colBulkOverdue);
+                          Refresh(ReleaseRequest_DB);
+                          Set(varToastMessage, "3일 경과 건을 일괄 강제완료했습니다.");
+                          Set(varShowToast, true);
+                        Size: =11
+                        Text: ="일괄 강제완료"
+                        Width: =110
+                        X: =12
+                        Y: =9
+      - Container11:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =41
+            Width: =119
+            X: =1234
+            Y: =52
+          Children:
+            - new_btn:
+                Control: Button@0.0.45
+                Properties:
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  BorderColor: =RGBA(27, 38, 59, 1)
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =0.3
+                  Font: =Font.Verdana
+                  FontColor: =RGBA(27, 38, 59, 1)
+                  FontSize: =11
+                  Height: =24
+                  Icon: ="Add"
+                  IconStyle: ='ButtonCanvas.IconStyle'.Filled
+                  Layout: ='ButtonCanvas.Layout'.IconBefore
+                  OnSelect: |-
+                    =Set(varRequestMode, "New");
+                    Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+                    NewForm(frmRequest);
+                    Set(varShowRequestPopup, true);
+                  Text: ="요청 등록"
+                  VerticalAlign: =VerticalAlign.Middle
+                  Width: =95
+                  X: =12
+                  Y: =9
+      - Icon4:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(243, 242, 241, 1)
+            DisabledColor: =RGBA(220, 220, 220, 1)
+            DisabledFill: =RGBA(0, 0, 0, 0)
+            Height: =25
+            HoverBorderColor: =RGBA(0, 0, 0, 0)
+            HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+            HoverFill: =RGBA(0, 0, 0, 0)
+            Icon: =Icon.Person
+            PaddingBottom: =3
+            PaddingLeft: =3
+            PaddingRight: =3
+            PaddingTop: =3
+            PressedBorderColor: =RGBA(0, 0, 0, 0)
+            PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+            PressedFill: =RGBA(0, 0, 0, 0)
+            Width: =25
+            X: =1283
+            Y: =4
+      - Container9:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            BorderColor: =RGBA(223, 228, 234, 1)
+            BorderThickness: =1
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =637
+            Width: =340
+            X: =657
+            Y: =100
+          Children:
+            - done_con:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  BorderStyle: =BorderStyle.None
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =615
+                  PaddingBottom: |+
+                    =10
+                  Width: =315
+                  X: =12
+                  Y: =12
+                Children:
+                  - Container4_1:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        Fill: =RGBA(34, 139, 34, 1)
+                        Height: =31
+                        Width: =315
+                      Children:
+                        - Label10_1:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Alignment: =Align.Center
+                              Color: =RGBA(255, 255, 255, 1)
+                              Font: =Font.Verdana
+                              FontSize: =11
+                              FontWeight: =FontWeight.Semibold
+                              Height: =31
+                              Text: ="완료"
+                              Width: =298
+                              X: =8
+                  - galCompleted:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_pcfCore
+                      Properties:
+                        BorderColor: =RGBA(243, 242, 241, 1)
+                        FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                        FocusedBorderThickness: =2
+                        Items: |-
+                          =SortByColumns(
+                              Filter(
+                                  ReleaseRequest_DB,
+                                  Stage.Value = "완료",
+                                  SubmittedAt >= varDateFrom,
+                                  SubmittedAt <= varDateTo,
+                                  IsBlank(Trim(txtSearch.Text)) ||
+                                  Lower(Trim(txtSearch.Text)) in Lower(PartNo) ||
+                                  Lower(Trim(txtSearch.Text)) in Lower(RequesterName)
+                              ),
+                              "CompletedAt",
+                              SortOrder.Descending
+                          )
+                        TemplateSize: =85
+                        Width: =315
+                        Y: =40
+                      Children:
+                        - Rectangle1_4:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(226, 232, 240, 1)
+                              BorderThickness: =0.5
+                              DisabledFill: =RGBA(0,0,0,0)
+                              Fill: =RGBA(240, 253, 244, 0.3)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =81
+                              HoverFill: =RGBA(0,0,0,0)
+                              OnSelect: =
+                              PressedFill: =RGBA(0,0,0,0)
+                              TabIndex: =0
+                              Width: =306
+                              X: =4
+                              Y: =2
+                        - Requester_2:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Color: =RGBA(71, 85, 105, 1)
+                              Font: =Font.Verdana
+                              FontSize: =8.5
+                              FontWeight: =FontWeight.Normal
+                              Height: =25
+                              OnSelect: =Select(Parent)
+                              TabIndex: =-1
+                              Text: =ThisItem.RequesterName & " / " & ThisItem.RequesterTeam & " · " & Concat(ThisItem.DrawingType, Value, ", ")
+                              VerticalAlignment: =VerticalAlign.Top
+                              Width: =Parent.TemplateWidth - 24
+                              X: =16
+                              Y: =44
+                        - Title_2:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Alignment: =Align.Left
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              FontWeight: =FontWeight.Normal
+                              Height: =22
+                              OnSelect: =Select(Parent)
+                              TabIndex: =-1
+                              Text: =ThisItem.PartNo
+                              VerticalAlignment: =VerticalAlign.Middle
+                              Width: =Parent.TemplateWidth - 24
+                              X: =16
+                              Y: =23
+                        - Stage_2:
+                            Control: Badge@0.0.24
+                            Properties:
+                              Appearance: ='BadgeCanvas.Appearance'.Outline
+                              BasePaletteColor: |-
+                                =Switch(
+                                    ThisItem.Status.Value,
+                                    "요청됨", RGBA(254, 243, 199, 1),
+                                    "수정완료", RGBA(224, 242, 254, 1),
+                                    "작업완료", RGBA(220, 252, 231, 1),
+                                    "강제완료", RGBA(241, 245, 249, 1),
+                                    RGBA(241, 245, 249, 1)
+                                )
+                              Content: =ThisItem.Status.Value
+                              Font: =Font.Verdana
+                              FontColor: =RGBA(0, 0, 0, 1)
+                              FontSize: =9
+                              FontWeight: =FontWeight.Semibold
+                              Height: =18
+                              Shape: ='BadgeCanvas.Shape'.Circular
+                              Width: =75
+                              X: =12
+                              Y: =5
+                        - Text5_2:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(100, 116, 139, 1)
+                              Font: =Font.Verdana
+                              Height: =22
+                              OnSelect: =Select(Parent)
+                              Size: =8.5
+                              Text: |-
+                                ="요청 " & Text(ThisItem.SubmittedAt, "yyyy.mm.dd") &
+                                "  | " & ThisItem.Status.Value & " " & Text(ThisItem.CompletedAt, "yyyy.mm.dd")
+                              Width: =Parent.TemplateWidth - 24
+                              X: =12
+                              Y: =61
+                        - Rectangle1_5:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              DisabledFill: =RGBA(0,0,0,0)
+                              Fill: =RGBA(0, 0, 0, 0)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =82
+                              HoverFill: =RGBA(248, 250, 252, 0.3)
+                              OnSelect: |-
+                                =Set(varSelectedRequest, ThisItem);
+                                Set(varRequestMode, "View");
+                                Set(varShowRequestPopup, true);
+                              PressedFill: =
+                              TabIndex: =0
+                              Width: =Parent.TemplateWidth
+      - con_searchFilter:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            BorderColor: =RGBA(223, 228, 234, 1)
+            BorderThickness: =1
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =637
+            Width: =271
+            X: =8
+            Y: =100
+          Children:
+            - ddPeriodFilter:
+                Control: DropDown@0.0.45
+                Properties:
+                  DefaultSelectedItems: =[varPeriodFilter]
+                  Items: =["이번주","이번달","날짜선택","전체"]
+                  OnChange: |-
+                    =// ddPeriodFilter.OnChange
+                    Set(varPeriodFilter, ddPeriodFilter.Selected.Value);
+
+                    // 기간 계산 (날짜선택 모드는 dpDateFrom/dpDateTo에서 직접 설정)
+                    Switch(
+                        varPeriodFilter,
+                        "이번주", Set(varDateFrom, DateAdd(Today(), -(Weekday(Today(), StartOfWeek.Monday) - 1), TimeUnit.Days)),
+                        "이번달", Set(varDateFrom, Date(Year(Today()), Month(Today()), 1)),
+                        "전체", Set(varDateFrom, Date(2020, 1, 1))
+                    );
+
+                    // 조회 기간 끝은 항상 현재 시각 (날짜선택 모드는 dpDateTo.OnChange에서 재설정)
+                    Set(varDateTo, Now());
+                  Width: =182
+                  X: =10
+                  Y: =38
+            - txtSearch:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: |+
+                    =
+                  Font: =Font.Verdana
+                  OnChange: =Set(varSearchText, txtSearch.Text)
+                  Placeholder: ="품번 / 요청자 검색"
+                  Size: =13
+                  Width: =236
+                  X: =10
+                  Y: =148
+            - tglOnlyOverdue:
+                Control: Toggle@1.1.5
+                Properties:
+                  Checked: =varOnlyOverdue
+                  Font: =Font.Verdana
+                  FontSize: =14
+                  Label: ="3일 경과 건만"
+                  OnCheck: =Set(varOnlyOverdue, true)
+                  OnUncheck: =Set(varOnlyOverdue, false)
+                  Width: =190
+                  X: =2
+                  Y: =191
+            - Text2:
+                Control: ModernText@1.0.0
+                Properties:
+                  Font: =Font.Verdana
+                  Size: =14
+                  Text: ="기간"
+                  Width: =67
+                  X: =10
+                  Y: =6
+            - Text2_1:
+                Control: ModernText@1.0.0
+                Properties:
+                  Font: =Font.Verdana
+                  Size: =14
+                  Text: ="검색"
+                  Width: =67
+                  X: =10
+                  Y: =116
+            - dpDateFrom:
+                Control: ModernDatePicker@1.0.1
+                Properties:
+                  OnChange: =Set(varDateFrom, dpDateFrom.SelectedDate)
+                  Visible: =varPeriodFilter = "날짜선택"
+                  Width: =115
+                  X: =10
+                  Y: =76
+            - dpDateTo:
+                Control: ModernDatePicker@1.0.1
+                Properties:
+                  OnChange: =Set(varDateTo, DateAdd(dpDateTo.SelectedDate, 1, TimeUnit.Days))
+                  Visible: =varPeriodFilter = "날짜선택"
+                  Width: =115
+                  X: =135
+                  Y: =76
+      - Container8:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            BorderColor: =RGBA(223, 228, 234, 1)
+            BorderThickness: =1
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =637
+            Width: =340
+            X: =293
+            Y: =100
+          Children:
+            - Inprogress_con:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  BorderStyle: =BorderStyle.None
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =615
+                  PaddingBottom: |+
+                    =10
+                  Width: =315
+                  X: =12
+                  Y: =12
+                Children:
+                  - Container4_2:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        Fill: =RGBA(14, 116, 144, 1)
+                        Height: =31
+                        Width: =315
+                      Children:
+                        - Label10_2:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Alignment: =Align.Center
+                              Color: =RGBA(255, 255, 255, 1)
+                              Font: =Font.Verdana
+                              FontSize: =11
+                              FontWeight: =FontWeight.Semibold
+                              Height: =31
+                              Text: ="진행중"
+                              Width: =297
+                              X: =8
+                        - btnSelectedForceComplete:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              Height: =27
+                              OnSelect: |-
+                                =ForAll(
+                                    colSelectedForce As req,
+                                    Patch(
+                                        ReleaseRequest_DB,
+                                        LookUp(ReleaseRequest_DB, ID = req.ID),
+                                        {
+                                            Stage: {Value: "완료"},
+                                            Status: {Value: "강제완료"},
+                                            CompletedAt: Now(),
+                                            HandlerEmail: varMyEmail
+                                        }
+                                    );
+                                    Office365Outlook.SendEmailV2(
+                                        req.RequesterEmail,
+                                        "[릴리즈 상태 변경] 강제완료 처리 - " & req.PartNo,
+                                        Concatenate(
+                                            "<div style='font-family:Segoe UI;'>",
+                                            "<h3>강제완료 처리 안내</h3>",
+                                            "<p><b>품번:</b> ", req.PartNo, "</p>",
+                                            "<p>DX팀에서 선택 강제완료 처리했습니다.</p>",
+                                            "</div>"
+                                        ),
+                                        {IsHtml: true, Importance: "Normal"}
+                                    )
+                                );
+
+                                Clear(colSelectedForce);
+                                Refresh(ReleaseRequest_DB);
+                                Set(varToastMessage, "선택한 건을 강제완료했습니다.");
+                                Set(varShowToast, true);
+                              Text: ="선택 강제완료 (" & CountRows(colSelectedForce) & ")"
+                              Visible: =varIsDX && CountRows(colSelectedForce) > 0
+                              Width: =115
+                              X: =195
+                              Y: =2
+                  - galInProgress:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_pcfCore
+                      Properties:
+                        BorderColor: =RGBA(243, 242, 241, 1)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                        FocusedBorderThickness: =2
+                        Items: |-
+                          =SortByColumns(
+                              Filter(
+                                  ReleaseRequest_DB,
+                                  Stage.Value = "진행중",
+                                  SubmittedAt >= varDateFrom,
+                                  SubmittedAt <= varDateTo,
+                                  !varOnlyOverdue || SubmittedAt <= DateAdd(Now(), -3, TimeUnit.Days),
+                                  IsBlank(Trim(txtSearch.Text)) ||
+                                  Lower(Trim(txtSearch.Text)) in Lower(PartNo) ||
+                                  Lower(Trim(txtSearch.Text)) in Lower(RequesterName)
+                              ),
+                              "SubmittedAt",
+                              SortOrder.Descending
+                          )
+                        TemplateSize: =86
+                        Width: =315
+                        Y: =40
+                      Children:
+                        - Rectangle1_2:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(226, 232, 240, 1)
+                              BorderThickness: =0.5
+                              DisabledFill: =RGBA(0,0,0,0)
+                              Fill: =RGBA(240, 249, 255, 0.3)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =83
+                              HoverFill: =RGBA(0,0,0,0)
+                              OnSelect: =
+                              PressedFill: =RGBA(0,0,0,0)
+                              TabIndex: =0
+                              Width: =306
+                              X: =4
+                              Y: =2
+                        - Requester_1:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Color: =RGBA(71, 85, 105, 1)
+                              Font: =Font.Verdana
+                              FontSize: =8.5
+                              FontWeight: =FontWeight.Normal
+                              Height: =25
+                              OnSelect: =Select(Parent)
+                              TabIndex: =-1
+                              Text: =ThisItem.RequesterName & " / " & ThisItem.RequesterTeam & " · " & Concat(ThisItem.DrawingType, Value, ", ")
+                              VerticalAlignment: =VerticalAlign.Top
+                              Width: =Parent.TemplateWidth - 24
+                              X: =16
+                              Y: =46
+                        - Title_1:
+                            Control: FluentV8/Label@1.8.6
+                            Properties:
+                              Alignment: =Align.Left
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              FontWeight: =FontWeight.Normal
+                              Height: =22
+                              OnSelect: =Select(Parent)
+                              TabIndex: =-1
+                              Text: =ThisItem.PartNo
+                              VerticalAlignment: =VerticalAlign.Middle
+                              Width: =Parent.TemplateWidth - 24
+                              X: =16
+                              Y: =23
+                        - Stage_1:
+                            Control: Badge@0.0.24
+                            Properties:
+                              Appearance: ='BadgeCanvas.Appearance'.Outline
+                              BasePaletteColor: =RGBA(5, 102, 178, 1)
+                              Content: =ThisItem.Status.Value
+                              Font: =Font.Verdana
+                              FontColor: =RGBA(0, 0, 0, 1)
+                              FontSize: =9
+                              FontWeight: =FontWeight.Semibold
+                              Height: =18
+                              Shape: ='BadgeCanvas.Shape'.Circular
+                              Width: =75
+                              X: =12
+                              Y: =5
+                        - Text5_1:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =If(ThisItem.SubmittedAt <= DateAdd(Now(), -3, TimeUnit.Days), RGBA(220, 38, 38, 1), RGBA(100, 116, 139, 1))
+                              Font: =Font.Verdana
+                              Height: =22
+                              OnSelect: =Select(Parent)
+                              Size: =8.5
+                              Text: |-
+                                ="요청 " & Text(ThisItem.SubmittedAt, "yyyy.mm.dd") &
+                                If(ThisItem.SubmittedAt <= DateAdd(Now(), -3, TimeUnit.Days), "  ⏰ 3일 경과", "")
+                              Width: =Parent.TemplateWidth - 24
+                              X: =12
+                              Y: =64
+                        - Rectangle1_3:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              DisabledFill: =RGBA(0,0,0,0)
+                              Fill: =RGBA(0, 0, 0, 0)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =86
+                              HoverFill: =RGBA(248, 250, 252, 0.3)
+                              OnSelect: |-
+                                =Set(varSelectedRequest, ThisItem);
+                                Set(varRequestMode, "View");
+                                Set(varShowRequestPopup, true);
+                              PressedFill: =
+                              TabIndex: =0
+                              Width: =Parent.TemplateWidth
+                        - chkSelect:
+                            Control: CheckBox@0.0.30
+                            Properties:
+                              Checked: =CountRows(Filter(colSelectedForce, ID = ThisItem.ID)) > 0
+                              Height: =20
+                              OnCheck: =Collect(colSelectedForce, ThisItem)
+                              OnSelect: =Select(Parent)
+                              OnUncheck: =RemoveIf(colSelectedForce, ID = ThisItem.ID)
+                              Visible: =varIsDX
+                              Width: =20
+                              X: =4
+                              Y: =2
+      - Icon3:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Color: =RGBA(53, 61, 63, 1)
+            DisabledBorderColor: =RGBA(243, 242, 241, 1)
+            DisabledColor: =RGBA(220, 220, 220, 1)
+            DisabledFill: =RGBA(0, 0, 0, 0)
+            Height: =24
+            HoverBorderColor: =RGBA(0, 0, 0, 0)
+            HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+            HoverFill: =RGBA(0, 0, 0, 0)
+            Icon: =Icon.OptionsList
+            PaddingBottom: =3
+            PaddingLeft: =3
+            PaddingRight: =3
+            PaddingTop: =3
+            PressedBorderColor: =RGBA(0, 0, 0, 0)
+            PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+            PressedFill: =RGBA(0, 0, 0, 0)
+            Width: =24
+            X: =16
+            Y: =66
+      - Header_con_5:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            Fill: =RGBA(27, 38, 59, 1)
+            Height: =35
+            Width: =1366
+          Children:
+            - name_label:
+                Control: FluentV8/Label@1.8.6
+                Properties:
+                  Color: =RGBA(230, 235, 242, 1)
+                  Font: =Font.Verdana
+                  FontSize: =8
+                  Height: =20
+                  Text: |+
+                    =If(
+                        IsBlank(Find("(", User().FullName)), // 괄호가 없는 경우 (이름 양식 2)
+                        Concatenate(
+                            Trim(Right(User().FullName, Len(User().FullName) - Find(" ", User().FullName))), // 공백 이후 성
+                            Trim(Left(User().FullName, Find(" ", User().FullName))) // 공백 이전 이름
+                        ),
+                        Trim(Left(User().FullName, Find("(", User().FullName) - 1)) // 괄호가 있는 경우 (이름 양식 1)
+                    )
+                  Width: =35
+                  X: =1310
+                  Y: =4
+            - Label8_3:
+                Control: FluentV8/Label@1.8.6
+                Properties:
+                  Alignment: =Align.Center
+                  Color: =RGBA(255, 255, 255, 1)
+                  Font: =Font.Verdana
+                  FontSize: =14
+                  FontWeight: =FontWeight.Semibold
+                  Height: =35
+                  Text: |-
+                    ="릴리즈 상태 요청 시스템
+                    "
+                  TextRole: ='Label.TextRole'.Heading1
+                  Width: =215
+            - name_label_6:
+                Control: FluentV8/Label@1.8.6
+                Properties:
+                  Color: =RGBA(255, 255, 255, 1)
+                  FontSize: =8
+                  Height: =25
+                  Text: =
+                  Width: =50
+                  X: =727
+                  Y: =10
+      - OuterRactangle:
+          Control: Rectangle@2.3.0
+          Properties:
+            BorderColor: =RGBA(243, 242, 241, 1)
+            BorderStyle: =BorderStyle.None
+            BorderThickness: =2
+            DisabledFill: =RGBA(0, 0, 0, 0)
+            Fill: =RGBA(0, 0, 0, 0.5)
+            FocusedBorderColor: =RGBA(98, 100, 167, 1)
+            Height: =770
+            HoverFill: =
+            OnSelect: |-
+              =Set(varShowRequestPopup, false);
+              Set(varRequestMode, "View");
+              Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+            PressedFill: =RGBA(0, 0, 0, 0)
+            Visible: =varShowRequestPopup
+            Width: =1369
+            X: =-1
+      - conRequestPopup:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =715
+            Visible: |+
+              =varShowRequestPopup
+            Width: =1019
+            X: =173
+            Y: =28
+          Children:
+            - conRequestView:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  Fill: =RGBA(174, 208, 221, 0.1)
+                  Height: =625
+                  Visible: =varShowRequestPopup && varRequestMode = "View"
+                  Width: =1019
+                  Y: =91
+                Children:
+                  - Container3:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        BorderColor: =RGBA(226, 232, 240, 1)
+                        BorderThickness: =1
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =126
+                        Width: =941
+                        X: =39
+                        Y: =15
+                      Children:
+                        - Text1_4:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(58, 65, 79, 1)
+                              Font: =Font.Verdana
+                              Size: =12
+                              Text: ="요청자"
+                              Width: =58
+                              X: =33
+                              Y: =48
+                        - Text1_5:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              Size: =13
+                              Text: =varSelectedRequest.RequesterName
+                              Width: =108
+                              X: =140
+                              Y: =48
+                        - Text1_6:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Font: =Font.Verdana
+                              Size: =13
+                              Text: =varSelectedRequest.RequesterTeam
+                              Width: =132
+                              X: =540
+                              Y: =48
+                        - Text1_21:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              Size: =13
+                              Text: =Concat(varSelectedRequest.DrawingType, Value, ", ")
+                              Width: =118
+                              X: =540
+                              Y: =85
+                        - Text1_23:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              Size: =13
+                              Text: |-
+                                =If(
+                                    IsBlank(varSelectedRequest.SubmittedAt),
+                                    "-",
+                                    Text(varSelectedRequest.SubmittedAt, "yyyy.mm.dd")
+                                )
+                              Width: =112
+                              X: =140
+                              Y: =85
+                        - Text1_7:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(58, 65, 79, 1)
+                              Font: =Font.Verdana
+                              Size: =12
+                              Text: ="요청일"
+                              Width: =58
+                              X: =33
+                              Y: =85
+                        - Text1_20:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(58, 65, 79, 1)
+                              Font: =Font.Verdana
+                              Size: =12
+                              Text: ="팀"
+                              Width: =58
+                              X: =427
+                              Y: =48
+                        - Text1_22:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(58, 65, 79, 1)
+                              Font: =Font.Verdana
+                              Size: =12
+                              Text: ="도면종류"
+                              Width: =90
+                              X: =427
+                              Y: =85
+                        - Text1:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              FontWeight: =FontWeight.Semibold
+                              Height: =33
+                              Text: ="요약정보"
+                              Width: =92
+                              X: =29
+                              Y: =8
+                        - Rectangle2:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              Fill: =RGBA(214, 221, 224, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =1
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Width: =895
+                              X: =24
+                              Y: =40
+                        - Rectangle2_1:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              Fill: =RGBA(214, 221, 224, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =60
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Width: =1
+                              X: =119
+                              Y: =52
+                        - Rectangle2_2:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              Fill: =RGBA(214, 221, 224, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =60
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Width: =1
+                              X: =525
+                              Y: =52
+                  - Container3_1:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        BorderColor: =RGBA(226, 232, 240, 1)
+                        BorderThickness: =1
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =204
+                        Width: =941
+                        X: =39
+                        Y: =153
+                      Children:
+                        - Text1_33:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Color: =RGBA(17, 24, 39, 1)
+                              Font: =Font.Verdana
+                              FontWeight: =FontWeight.Semibold
+                              Height: =33
+                              Text: ="비고"
+                              Width: =92
+                              X: =29
+                              Y: =8
+                        - Rectangle2_3:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              Fill: =RGBA(214, 221, 224, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =1
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Width: =895
+                              X: =24
+                              Y: =40
+                        - Text1_3:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              BorderColor: =RGBA(226, 232, 240, 1)
+                              BorderStyle: =BorderStyle.Solid
+                              BorderThickness: =1
+                              Color: =RGBA(17, 24, 39, 1)
+                              Fill: =RGBA(248, 250, 252, 1)
+                              Font: =Font.Verdana
+                              Height: =62
+                              Size: =13
+                              Text: =Coalesce(varSelectedRequest.Note, "-")
+                              Width: =895
+                              X: =140
+                              Y: =97
+                  - conRequesterAction:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        BorderColor: =RGBA(226, 232, 240, 1)
+                        BorderThickness: =1
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =100
+                        Visible: =Lower(varSelectedRequest.RequesterEmail) = varMyEmail && varSelectedRequest.Status.Value = "수정완료"
+                        Width: =941
+                        X: =39
+                        Y: =510
+                      Children:
+                        - btnRequesterComplete:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              OnSelect: |-
+                                =Patch(
+                                    ReleaseRequest_DB,
+                                    varSelectedRequest,
+                                    {
+                                        Stage: {Value: "완료"},
+                                        Status: {Value: "작업완료"},
+                                        CompletedAt: Now()
+                                    }
+                                );
+
+                                Office365Outlook.SendEmailV2(
+                                    varDxRecipients,
+                                    "[릴리즈 상태 변경 완료] " & varSelectedRequest.PartNo,
+                                    Concatenate(
+                                        "<div style='font-family:Segoe UI;'>",
+                                        "<h3>요청자가 작업완료를 확인했습니다</h3>",
+                                        "<p><b>품번:</b> ", varSelectedRequest.PartNo, "</p>",
+                                        "<p><b>요청자:</b> ", varSelectedRequest.RequesterName, "</p>",
+                                        "</div>"
+                                    ),
+                                    {IsHtml: true, Importance: "Normal"}
+                                );
+
+                                Refresh(ReleaseRequest_DB);
+                                Set(varShowRequestPopup, false);
+                                Set(varToastMessage, "작업완료 처리되었습니다.");
+                                Set(varShowToast, true);
+                              Text: ="작업완료"
+                              X: =20
+                              Y: =50
+                        - Text4:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Text: ="요청 처리"
+                              Width: =92
+                              X: =29
+                              Y: =8
+                        - Rectangle1:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(200, 198, 196, 1)
+                              Fill: =RGBA(98, 100, 167, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =1
+                              HoverFill: =RGBA(98, 100, 167, 1)
+                              PressedFill: =RGBA(98, 100, 167, 1)
+                              Width: =895
+                              X: =24
+                              Y: =40
+                        - Text6:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Text: ="DX팀이 수정을 완료했습니다. 확인 후 작업완료를 눌러주세요."
+                              Width: =500
+                              X: =118
+                              Y: =54
+                  - conDxAction:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Height: =100
+                        Visible: =varIsDX && varSelectedRequest.Stage.Value = "진행중"
+                        Width: =941
+                        X: =39
+                        Y: =510
+                      Children:
+                        - btnDxModifyComplete:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              OnSelect: |-
+                                =Patch(
+                                    ReleaseRequest_DB,
+                                    varSelectedRequest,
+                                    {
+                                        Status: {Value: "수정완료"},
+                                        ModifiedByDXAt: Now(),
+                                        HandlerEmail: varMyEmail
+                                    }
+                                );
+
+                                Office365Outlook.SendEmailV2(
+                                    varSelectedRequest.RequesterEmail,
+                                    "[릴리즈 상태 변경] 수정완료 - " & varSelectedRequest.PartNo,
+                                    Concatenate(
+                                        "<div style='font-family:Segoe UI;'>",
+                                        "<h3>릴리즈 상태 변경이 완료되었습니다</h3>",
+                                        "<p><b>품번:</b> ", varSelectedRequest.PartNo, "</p>",
+                                        "<p>확인 후 작업완료를 눌러주세요.</p>",
+                                        "</div>"
+                                    ),
+                                    {IsHtml: true, Importance: "Normal"}
+                                );
+
+                                Refresh(ReleaseRequest_DB);
+                                Set(varShowRequestPopup, false);
+                                Set(varToastMessage, "수정완료 처리되었습니다.");
+                                Set(varShowToast, true);
+                              Text: ="수정완료"
+                              Visible: =varSelectedRequest.Status.Value = "요청됨"
+                              X: =40
+                              Y: =40
+                        - btnDxForceComplete:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              OnSelect: |-
+                                =Patch(
+                                    ReleaseRequest_DB,
+                                    varSelectedRequest,
+                                    {
+                                        Stage: {Value: "완료"},
+                                        Status: {Value: "강제완료"},
+                                        CompletedAt: Now(),
+                                        HandlerEmail: varMyEmail
+                                    }
+                                );
+
+                                Office365Outlook.SendEmailV2(
+                                    varSelectedRequest.RequesterEmail,
+                                    "[릴리즈 상태 변경] 강제완료 처리 - " & varSelectedRequest.PartNo,
+                                    Concatenate(
+                                        "<div style='font-family:Segoe UI;'>",
+                                        "<h3>강제완료 처리 안내</h3>",
+                                        "<p><b>품번:</b> ", varSelectedRequest.PartNo, "</p>",
+                                        "<p>장기간 미확인으로 DX팀에서 강제완료 처리했습니다.</p>",
+                                        "</div>"
+                                    ),
+                                    {IsHtml: true, Importance: "Normal"}
+                                );
+
+                                Refresh(ReleaseRequest_DB);
+                                Set(varShowRequestPopup, false);
+                                Set(varToastMessage, "강제완료 처리되었습니다.");
+                                Set(varShowToast, true);
+                              Text: ="강제완료"
+                              X: =150
+                              Y: =60
+                        - Text5:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Text: ="DX 처리"
+                              Width: =92
+                              X: =29
+                              Y: =8
+                        - Rectangle1_1:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledFill: =RGBA(200, 198, 196, 1)
+                              Fill: =RGBA(98, 100, 167, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              Height: =1
+                              HoverFill: =RGBA(98, 100, 167, 1)
+                              PressedFill: =RGBA(98, 100, 167, 1)
+                              Width: =895
+                              X: =24
+                              Y: =40
+                        - Text7:
+                            Control: ModernText@1.0.0
+                            Properties:
+                              Text: |-
+                                =If(
+                                    varSelectedRequest.Status.Value = "요청됨",
+                                    "PLM 상태 변경 작업 후 수정완료를 눌러주세요.",
+                                    "요청자의 작업완료 확인을 기다리는 중입니다."
+                                )
+                              Width: =400
+                              X: =118
+                              Y: =8
+            - confrmRequest:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =653
+                  Visible: =varShowRequestPopup && (varRequestMode = "New" || varRequestMode = "Edit")
+                  Width: =1019
+                  Y: =62
+                Children:
+                  - frmRequest:
+                      Control: Form@2.4.4
+                      Layout: Vertical
+                      Properties:
+                        BorderColor: =RGBA(243, 242, 241, 1)
+                        DataSource: =ReleaseRequest_DB
+                        Height: =597
+                        Item: =varSelectedRequest
+                        NumberOfColumns: =2
+                        OnSuccess: |-
+                          =// 신규 등록 시에만 시스템 필드 보강 + 메일 발송
+                          If(
+                              varRequestMode = "New",
+
+                              // 요청자 정보 스냅샷 + 상태 초기값
+                          Patch(
+                              ReleaseRequest_DB,
+                              Self.LastSubmit,
+                              {
+                                  Title: Self.LastSubmit.PartNo,
+                                  RequesterName: varMyName,
+                                  RequesterTeam: varMyTeam,
+                                  RequesterEmail: varMyEmail,
+                                  Stage: {Value: "진행중"},
+                                  Status: {Value: "요청됨"},
+                                  SubmittedAt: Now()
+                              }
+                          );
+
+                              // DX팀 메일 발송
+                              Office365Outlook.SendEmailV2(
+                                  varDxRecipients,
+                                  "[릴리즈 상태 변경 요청] " & Self.LastSubmit.PartNo,
+                                  Concatenate(
+                                      "<div style='font-family:Segoe UI;'>",
+                                      "<h3>릴리즈 상태 변경 요청이 등록되었습니다</h3>",
+                                      "<p><b>품번:</b> ", Self.LastSubmit.PartNo, "</p>",
+                                      "<p><b>도면종류:</b> ", Concat(Self.LastSubmit.DrawingType, Value, ", "), "</p>",
+                                      "<p><b>요청자:</b> ", varMyName, " (", varMyTeam, ")</p>",
+                                      "<p><b>요청일시:</b> ", Text(Now(), "yyyy-mm-dd hh:mm"), "</p>",
+                                      "</div>"
+                                  ),
+                                  {IsHtml: true, Importance: "Normal"}
+                              )
+                          );
+
+                          // 저장 후 공통 처리
+                          Refresh(ReleaseRequest_DB);
+                          ResetForm(frmRequest);
+                          Set(varShowRequestPopup, false);
+                          Set(varRequestMode, "View");
+                          Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+                          Set(varToastMessage, "릴리즈 상태 변경 요청이 등록되었습니다.");
+                          Set(varShowToast, true);
+                        Width: =751
+                        X: =135
+                        Y: =10
+                      Children:
+                        - PartNo_DataCard1:
+                            Control: TypedDataCard@1.0.7
+                            Variant: TextualEdit
+                            IsLocked: true
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              DataField: ="PartNo"
+                              Default: =ThisItem.PartNo
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'PartNo')
+                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, 'PartNo')
+                              Required: =true
+                              Update: =DataCardValue1.Value
+                              X: =0
+                              Y: =0
+                            Children:
+                              - DataCardKey1:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldName
+                                  Properties:
+                                    Height: =22
+                                    Text: =Parent.DisplayName
+                                    Weight: ='TextCanvas.Weight'.Semibold
+                                    Width: =Parent.Width - 48
+                                    Wrap: =false
+                                    X: =24
+                                    Y: =10
+                              - DataCardValue1:
+                                  Control: TextInput@0.0.54
+                                  MetadataKey: FieldValue
+                                  Properties:
+                                    AccessibleLabel: =Parent.DisplayName
+                                    DisplayMode: =Parent.DisplayMode
+                                    Mode: ="'TextInputCanvas.Mode'.TextInputModeSingleLine"
+                                    Required: =Parent.Required
+                                    ValidationState: =If(IsBlank(Parent.Error), "None", "Error")
+                                    Value: =Parent.Default
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardKey1.Y + DataCardKey1.Height + 4
+                              - ErrorMessage1:
+                                  Control: Text@0.0.51
+                                  MetadataKey: ErrorMessage
+                                  Properties:
+                                    Height: =30
+                                    Text: =Parent.Error
+                                    Visible: =And(!IsBlank(Parent.Error), Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardValue1.Y + DataCardValue1.Height
+                              - StarVisible1:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldRequired
+                                  Properties:
+                                    Align: ='TextCanvas.Align'.Center
+                                    Height: =30
+                                    Text: ="*"
+                                    Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =30
+                                    Y: =DataCardKey1.Y
+                        - DrawingType_DataCard1:
+                            Control: TypedDataCard@1.0.7
+                            Variant: ComboBoxMultiSelectEdit
+                            IsLocked: true
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              DataField: ="DrawingType"
+                              Default: =ThisItem.DrawingType
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'DrawingType')
+                              Required: =true
+                              Update: =DataCardValue2.SelectedItems
+                              X: =0
+                              Y: =0
+                            Children:
+                              - DataCardKey2:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldName
+                                  Properties:
+                                    Height: =22
+                                    Text: =Parent.DisplayName
+                                    Weight: ='TextCanvas.Weight'.Semibold
+                                    Width: =Parent.Width - 48
+                                    Wrap: =false
+                                    X: =24
+                                    Y: =10
+                              - DataCardValue2:
+                                  Control: ComboBox@0.0.51
+                                  MetadataKey: FieldValue
+                                  Properties:
+                                    AccessibleLabel: =Parent.DisplayName
+                                    DefaultSelectedItems: =Parent.Default
+                                    DisplayMode: =Parent.DisplayMode
+                                    Items: =Choices([@ReleaseRequest_DB].'DrawingType')
+                                    Required: =Parent.Required
+                                    SelectMultiple: =true
+                                    ValidationState: =If(IsBlank(Parent.Error), "None", "Error")
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardKey2.Y + DataCardKey2.Height + 4
+                              - ErrorMessage2:
+                                  Control: Text@0.0.51
+                                  MetadataKey: ErrorMessage
+                                  Properties:
+                                    Height: =30
+                                    Text: =Parent.Error
+                                    Visible: =And(!IsBlank(Parent.Error), Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardValue2.Y + DataCardValue2.Height
+                              - StarVisible2:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldRequired
+                                  Properties:
+                                    Align: ='TextCanvas.Align'.Center
+                                    Height: =20
+                                    Text: ="*"
+                                    Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =30
+                                    Y: =DataCardKey2.Y
+                        - Note_DataCard1:
+                            Control: TypedDataCard@1.0.7
+                            Variant: TextualEdit
+                            IsLocked: true
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              DataField: ="Note"
+                              Default: =ThisItem.Note
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'Note')
+                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, 'Note')
+                              Required: =false
+                              Update: =DataCardValue4.Value
+                              X: =0
+                              Y: =0
+                            Children:
+                              - DataCardKey3:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldName
+                                  Properties:
+                                    Height: =22
+                                    Text: =Parent.DisplayName
+                                    Weight: ='TextCanvas.Weight'.Semibold
+                                    Width: =Parent.Width - 48
+                                    Wrap: =false
+                                    X: =24
+                                    Y: =10
+                              - DataCardValue4:
+                                  Control: TextInput@0.0.54
+                                  MetadataKey: FieldValue
+                                  Properties:
+                                    AccessibleLabel: =Parent.DisplayName
+                                    DisplayMode: =Parent.DisplayMode
+                                    Mode: ="'TextInputCanvas.Mode'.TextInputModeSingleLine"
+                                    Required: =Parent.Required
+                                    ValidationState: =If(IsBlank(Parent.Error), "None", "Error")
+                                    Value: =Parent.Default
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardKey3.Y + DataCardKey3.Height + 4
+                              - ErrorMessage3:
+                                  Control: Text@0.0.51
+                                  MetadataKey: ErrorMessage
+                                  Properties:
+                                    Height: =30
+                                    Text: =Parent.Error
+                                    Visible: =And(!IsBlank(Parent.Error), Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =Parent.Width - 48
+                                    X: =24
+                                    Y: =DataCardValue4.Y + DataCardValue4.Height
+                              - StarVisible3:
+                                  Control: Text@0.0.51
+                                  MetadataKey: FieldRequired
+                                  Properties:
+                                    Align: ='TextCanvas.Align'.Center
+                                    Height: =30
+                                    Text: ="*"
+                                    Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                                    Width: =30
+                                    Y: =DataCardKey3.Y
+                  - btnRequestSave:
+                      Control: Button@0.0.45
+                      Properties:
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        BorderStyle: =BorderStyle.Solid
+                        BorderThickness: =1
+                        OnSelect: =SubmitForm(frmRequest)
+                        Text: ="등록"
+                        Visible: =varRequestMode = "New" || varRequestMode = "Edit"
+                        X: =618
+                        Y: =540
+                  - btnRequestCancel:
+                      Control: Button@0.0.45
+                      Properties:
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        BorderStyle: =BorderStyle.Solid
+                        BorderThickness: =1
+                        OnSelect: |-
+                          =ResetForm(frmRequest);
+                          Set(varShowRequestPopup, false);
+                          Set(varRequestMode, "View");
+                          Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+                        Text: ="취소"
+                        Visible: =varRequestMode = "New" || varRequestMode = "Edit"
+                        X: =732
+                        Y: =540
+            - Container2:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  Height: =94
+                  Visible: =varShowRequestPopup && varRequestMode = "View"
+                  Width: =Parent.Width
+                Children:
+                  - Stage_3:
+                      Control: Badge@0.0.24
+                      Properties:
+                        Appearance: ='BadgeCanvas.Appearance'.Outline
+                        BasePaletteColor: |-
+                          =Switch(
+                              varSelectedRequest.Status.Value,
+                              "요청됨", RGBA(254, 243, 199, 1),
+                              "수정완료", RGBA(224, 242, 254, 1),
+                              "작업완료", RGBA(220, 252, 231, 1),
+                              "강제완료", RGBA(241, 245, 249, 1),
+                              RGBA(241, 245, 249, 1)
+                          )
+                        Content: =varSelectedRequest.Status.Value
+                        Font: =Font.Verdana
+                        FontColor: |-
+                          =Switch(
+                              varSelectedRequest.Status.Value,
+                              "요청됨", RGBA(180, 83, 9, 1),
+                              "수정완료", RGBA(3, 105, 161, 1),
+                              "작업완료", RGBA(21, 128, 61, 1),
+                              "강제완료", RGBA(71, 85, 105, 1),
+                              RGBA(71, 85, 105, 1)
+                          )
+                        FontSize: =12
+                        FontWeight: =FontWeight.Semibold
+                        Height: =22
+                        Shape: ='BadgeCanvas.Shape'.Circular
+                        Width: =100
+                        X: =42
+                        Y: =58
+                  - Text1_1:
+                      Control: ModernText@1.0.0
+                      Properties:
+                        Color: =RGBA(17, 24, 39, 1)
+                        Font: =Font.Verdana
+                        FontWeight: =FontWeight.Semibold
+                        Height: =46
+                        Size: =18
+                        Text: =varSelectedRequest.PartNo
+                        Width: =764
+                        X: =38
+                        Y: =12
+                  - Icon1:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        Color: =RGBA(106, 122, 127, 1)
+                        DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                        DisabledColor: =RGBA(220, 220, 220, 1)
+                        DisabledFill: =RGBA(0, 0, 0, 0)
+                        FocusedBorderThickness: =1
+                        Height: =32
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                        HoverFill: =RGBA(0, 0, 0, 0)
+                        Icon: =Icon.Cancel
+                        OnSelect: |-
+                          =Set(varShowRequestPopup, false);
+                          Set(varRequestMode, "View");
+                          Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+                        PaddingBottom: =3
+                        PaddingLeft: =3
+                        PaddingRight: =3
+                        PaddingTop: =3
+                        PressedBorderColor: =RGBA(0, 0, 0, 0)
+                        PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                        PressedFill: =RGBA(0, 0, 0, 0)
+                        Width: =32
+                        X: =974
+                        Y: =11
+            - Container5:
+                Control: GroupContainer@1.5.0
+                Variant: ManualLayout
+                Properties:
+                  Fill: =RGBA(214, 221, 224, 0.3)
+                  Height: =62
+                  Visible: =varShowRequestPopup && (varRequestMode = "New" || varRequestMode = "Edit")
+                  Width: =1019
+                Children:
+                  - Icon1_1:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        Color: =RGBA(106, 122, 127, 1)
+                        DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                        DisabledColor: =RGBA(220, 220, 220, 1)
+                        DisabledFill: =RGBA(0, 0, 0, 0)
+                        FocusedBorderThickness: =1
+                        Height: =32
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                        HoverFill: =RGBA(0, 0, 0, 0)
+                        Icon: =Icon.Cancel
+                        OnSelect: |-
+                          =ResetForm(frmRequest);
+                          Set(varShowRequestPopup, false);
+                          Set(varRequestMode, "View");
+                          Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+                        PaddingBottom: =3
+                        PaddingLeft: =3
+                        PaddingRight: =3
+                        PaddingTop: =3
+                        PressedBorderColor: =RGBA(0, 0, 0, 0)
+                        PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                        PressedFill: =RGBA(0, 0, 0, 0)
+                        Width: =32
+                        X: =976
+                        Y: =9
+                  - Text3:
+                      Control: ModernText@1.0.0
+                      Properties:
+                        Color: =RGBA(17, 24, 39, 1)
+                        Font: =Font.Verdana
+                        FontWeight: =FontWeight.Semibold
+                        Height: =38
+                        Size: =18
+                        Text: ="릴리즈 상태 변경 요청"
+                        Width: =220
+                        X: =145
+                        Y: =9
+      - conNotice:
+          Control: GroupContainer@1.5.0
+          Variant: ManualLayout
+          Properties:
+            Fill: =RGBA(159, 227, 171, 0.57)
+            Height: =34
+            Visible: =varShowToast
+            Width: =278
+            X: =571
+            Y: =56
+          Children:
+            - text:
+                Control: Text@0.0.51
+                Properties:
+                  Align: ='TextCanvas.Align'.Center
+                  Font: =Font.Verdana
+                  Size: =12
+                  Text: =varToastMessage
+                  VerticalAlign: =VerticalAlign.Middle
+                  Width: =170
+                  X: =32
+                  Y: =1
+            - toastTimer:
+                Control: Timer@2.1.0
+                Properties:
+                  AutoStart: =true
+                  BorderColor: =RGBA(98, 100, 167, 1)
+                  BorderStyle: =BorderStyle.None
+                  Color: =RGBA(255, 255, 255, 1)
+                  DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                  DisabledColor: =RGBA(200, 198, 196, 1)
+                  DisabledFill: =RGBA(243, 242, 241, 1)
+                  Duration: =3000
+                  Fill: =RGBA(98, 100, 167, 1)
+                  FocusedBorderThickness: =2
+                  Font: =Font.'Segoe UI'
+                  Height: =34
+                  HoverBorderColor: =ColorFade(RGBA(98, 100, 167, 1), -10%)
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =ColorFade(RGBA(98, 100, 167, 1), -10%)
+                  OnTimerEnd: =Set(varShowToast, false)
+                  PressedBorderColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  PressedColor: =RGBA(255, 255, 255, 1)
+                  PressedFill: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  Size: =10.5
+                  Start: |+
+                    =varShowToast
+                  Visible: =false
+                  X: =50
+            - Icon5:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  BorderColor: =RGBA(0, 0, 0, 0)
+                  Color: =RGBA(79, 90, 94, 1)
+                  DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                  DisabledColor: =RGBA(220, 220, 220, 1)
+                  DisabledFill: =RGBA(0, 0, 0, 0)
+                  Height: =26
+                  HoverBorderColor: =RGBA(0, 0, 0, 0)
+                  HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  HoverFill: =RGBA(0, 0, 0, 0)
+                  Icon: =Icon.Cancel
+                  OnSelect: =Set(varShowToast,false)
+                  PaddingBottom: =3
+                  PaddingLeft: =3
+                  PaddingRight: =3
+                  PaddingTop: =3
+                  PressedBorderColor: =RGBA(0, 0, 0, 0)
+                  PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  PressedFill: =RGBA(0, 0, 0, 0)
+                  Width: =26
+                  X: =245
+                  Y: =4
+            - Icon7:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  BorderColor: =RGBA(0, 0, 0, 0)
+                  Color: =RGBA(54, 176, 75, 1)
+                  DisabledBorderColor: =RGBA(243, 242, 241, 1)
+                  DisabledColor: =RGBA(220, 220, 220, 1)
+                  DisabledFill: =RGBA(0, 0, 0, 0)
+                  Height: =25
+                  HoverBorderColor: =RGBA(0, 0, 0, 0)
+                  HoverColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  HoverFill: =RGBA(0, 0, 0, 0)
+                  Icon: =Icon.CheckBadge
+                  PaddingBottom: =3
+                  PaddingLeft: =3
+                  PaddingRight: =3
+                  PaddingTop: =3
+                  PressedBorderColor: =RGBA(0, 0, 0, 0)
+                  PressedColor: =ColorFade(RGBA(98, 100, 167, 1), -30%)
+                  PressedFill: =RGBA(0, 0, 0, 0)
+                  Width: =25
+                  X: =7
+                  Y: =4.5
