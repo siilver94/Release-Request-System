@@ -1,7 +1,7 @@
 # _README.md — 릴리즈 상태 요청 시스템 구조 명세
 
-> 상태: **설계 확정 / 개조 착수 전**. 실제 화면(`WorkRequest_Screen.yaml.txt`)은 아직 원본(시작실 작업의뢰) 상태다.
-> 개조가 진행되면 이 문서를 계속 최신화한다.
+> 상태: **핵심 워크플로우 개조 완료**. 요청 등록→진행중→수정완료→작업완료/강제완료까지 전체 사이클 구현됨(필드 편집만 Studio에서 확인 필요). 남음: DX 편의 기능(일괄/선택 강제완료, Export), 이메일 4종 중 나머지 실물 테스트, 3일 리마인드 flow.
+> 개조가 진행되면 이 문서를 계속 최신화한다 (변경마다 X, 큰 단계 끝날 때 배치로).
 
 ---
 
@@ -25,6 +25,8 @@
 | `CompletedAt` | 완료일시 | 날짜및시간 | 시스템 | 완료로 넘어간 시각 |
 | `HandlerEmail` | DX담당자메일 | 단일텍스트 | 시스템 | 처리한 DX 담당자 |
 | `Note` | 비고 | 여러줄텍스트 | 요청자(선택) | 변경 사유 등. 선택 입력 |
+
+> ⚠️ `DrawingType`은 SharePoint에서 **"여러 값 선택 가능"을 반드시 켜야** 함 (안 켜면 Concat 등에서 오류). `Stage`/`Status`/`DrawingType`은 Choice 타입이라 읽을 땐 `.Value`, Patch로 쓸 땐 `{Value: "텍스트"}`로 감싸야 함.
 
 ### 1-2. `UserInfo_DB` (원본 재사용)
 로그인 사용자 조직정보 조회용. 컬럼: `e-mail`, `이름_한글`, `부문`, `팀`, `직급2` 등.
@@ -64,17 +66,25 @@
 | `varSelectedRequest` | 현재 선택 요청 |
 | `varSearchText` | 검색어 |
 | `varShowToast`, `varToastMessage` | 토스트 알림 |
-| `varShowDeleteConfirmPopup` | 삭제 확인 팝업 |
 
 ### 3-2. 신규 추가
+
+**App.OnStart (전역, 앱 시작 시 1회 설정 · 반영 완료)**
+| 변수/컬렉션 | 용도 |
+|---|---|
+| `colDxTeam` | DX팀 담당자 목록 {DxEmail, DxName}. 현재: 김봉진(bongjin.kim@tym.world), 최인호(inho.choi@tym.world) |
+| `varDxRecipients` | DX팀 메일 발송용 수신자 문자열 (세미콜론 구분, colDxTeam.DxEmail 결합) |
+| `colDrawingTypeChoices` | 도면종류 선택지 {Value}: 3D / 2D / WTPart |
+
+**Screen.OnVisible (사용자별, 반영 완료)**
 | 변수 | 용도 |
 |---|---|
-| `varDxHandlerEmail` | DX팀 수신용 메일 (요청 알림 대상) |
-| `varIsDX` | 현재 사용자가 DX팀 담당자인지 |
-| `varPeriodFilter` | 기간 필터: 이번주 / 이번달 / 날짜선택 / 전체 |
-| `varDateFrom`, `varDateTo` | 날짜선택 시 범위 |
-| `varOnlyOverdue` | "3일 경과 건만" 필터 토글 |
-| `colSelectedForce` | 선택 강제완료용 체크된 건 컬렉션 |
+| `varIsDX` | 로그인 사용자가 DX팀인지: varMyEmail in colDxTeam.DxEmail |
+| `varPeriodFilter` | 기간 필터: 이번주 / 이번달 / 날짜선택 / 전체 (기본값 "이번달") |
+| `varDateFrom`, `varDateTo` | 조회 기간 범위 (날짜선택 모드는 dpDateFrom/dpDateTo가 직접 갱신) |
+| `varOnlyOverdue` | "3일 경과 건만" 필터 토글 (con_searchFilter의 tglOnlyOverdue와 연결, 반영 완료) |
+| `colSelectedForce` | 선택 강제완료용 체크된 건 컬렉션 (변수는 선언됨, 실제 체크박스 UI는 미구현 - DX 편의 기능 단계에서 작업) |
+| `varIsViewer` 판별 이메일 | `eunseong.kim@tym.world` 1개만 (본인) |
 
 ### 3-3. 제거 (승인 흐름 잔재)
 `varIsWorker`, `varIsTeamLeader`, `varWorkerEmail`, `varShowSelfApproveConfirmPopup`, 반려 관련 상태 → 릴리즈 시스템에서 재설계/제거.
@@ -85,19 +95,32 @@
 
 | 스크린/컴포넌트 | 상태 | 비고 |
 |---|---|---|
-| `App.OnStart.yaml.txt` | 신규 작성 | 데이터소스 연결·전역변수 초기화 |
+| `App.OnStart.yaml.txt` | ✅ 완료 | colDxTeam, varDxRecipients, colDrawingTypeChoices |
 | `WorkRequest_Screen.yaml.txt` | 개조 중 | → 릴리즈 요청 메인 화면. 추후 파일명 변경 검토 |
 
-### 메인 화면 주요 컨트롤 (개조 계획)
-| 원본 컨트롤 | 조치 |
-|---|---|
-| `Container7` / `beforeTask_con` / `galStart` (시작전) | **삭제** |
-| `Container8` / `galInProgress` (진행중) | 유지 + 체크박스·강제완료 추가 |
-| `Container9` / `galCompleted` (완료) | 유지 |
-| `con_searchFilter` | 기간필터 교체 + 3일경과 토글 추가 |
-| `frmRequest` (요청 폼) | 품번 + 도면종류(다중) 카드로 교체, 나머지 제거 |
-| `conLeaderAction` / `conWorkerAction` 등 승인·반려 UI | **제거/재설계** |
-| 신규 버튼 | 단건 강제완료 / 일괄 강제완료 / 선택 강제완료 / Export(CSV) |
+### 메인 화면 주요 컨트롤 (진행 현황)
+
+| 컨트롤 | 상태 | 내용 |
+|---|---|---|
+| `Container7` / `beforeTask_con` / `galStart` (시작전) | ✅ 삭제 완료 | |
+| `Container8`(진행중), `Container9`(완료) | ✅ 위치 이동 완료 | X: 293 / 657 (필터 우측부터 순서대로) |
+| `galInProgress`, `galCompleted` | ✅ 데이터 바인딩 완료 | `ReleaseRequest_DB` 기준, Stage.Value 필터, Status.Value 배지(요청됨/수정완료/작업완료/강제완료), 품번+도면종류 표시, 3일경과 빨간 강조 |
+| `con_searchFilter` | ✅ 개조 완료 | `ddPeriodFilter`(이번주/이번달/날짜선택/전체) + `dpDateFrom`/`dpDateTo`(신규, 날짜선택 모드에서만 표시) + `txtSearch`(품번/요청자 검색) + `tglOnlyOverdue`(기존 tglIncludeCompleted 재활용, "3일 경과 건만"). `tglIncludeRejected`는 삭제 |
+| `new_btn`(헤더 "요청 등록") | ✅ 완료 | `Defaults(ReleaseRequest_DB)` 기준으로 New 모드 시작 |
+| `OuterRactangle`(팝업 바깥 클릭 닫기) | ✅ 완료 | 첨부파일 로직 제거, ReleaseRequest_DB 기준 |
+| `frmRequest`(요청 등록 폼) | ✅ 완료 | DataSource=ReleaseRequest_DB. **필드 구성은 Studio "필드 편집"으로 직접 교체**(품번/도면종류/비고, 필수=품번·도면종류) → 이 파일의 DataCard 자식 노드는 원본(작업의뢰) 그대로라 실제 Studio 상태와 다름(의도된 것). OnSuccess에서 Stage/Status 초기화 + DX팀 메일 발송 |
+| `btnRequestSave`, `btnRequestCancel` | ✅ 완료 | 필수값 검증은 폼 Required로 위임, SubmitForm만 호출 |
+| `Container5`(등록 팝업 헤더) | ✅ 완료 | 제목 "릴리즈 상태 변경 요청"으로 교체 |
+| `conRequestView`(상세보기), `Container2`(상세보기 헤더) | ✅ 완료 | 요약정보 박스: 팀=RequesterTeam, "희망완료일"→"도면종류". 비고 박스로 단순화. 헤더 배지/제목 Status.Value·PartNo 기준 |
+| `Container3_2`(frmRequestAttachmentView, 첨부파일) | ✅ 삭제 완료 | 첨부파일 기능 없음 |
+| `lblRejectReasonTitle` 등 반려 라벨 3종 | ✅ 삭제 완료 | 반려 없음 |
+| `conRequesterAction` (재구성) | ✅ 완료 | 요청자 "작업완료" 버튼. Visible: 본인 요청 && Status=수정완료 |
+| `conDxAction` (신규, conLeaderAction+conWorkerAction 대체) | ✅ 완료 | DX "수정완료"(Status=요청됨일 때만)/"강제완료"(항상) 버튼. Visible: varIsDX && Stage=진행중 |
+| `OuterRactangle_1`, `conSelfApproveConfirmPopup`, `conDeleteConfirmPopup` | ✅ 삭제 완료 | 트리거 버튼 소실로 죽은 코드였음 (원본의 "의뢰 삭제/대리승인" 기능. 필요시 추후 "요청 취소" 기능으로 재설계 가능) |
+| `conDxHeaderTools`("일괄 강제완료"/"Export" 버튼, 헤더) | ✅ 완료 | Visible=varIsDX. 일괄강제완료: 임시 컬렉션(colBulkOverdue)에 먼저 담고 ForAll+Patch (원본 데이터소스 직접 순회 Patch 불가 이슈로) |
+| `btnSelectedForceComplete`(진행중 헤더 바 안, 체크된 건만 강제완료) | ✅ 완료 | Visible=varIsDX && 선택건수>0 |
+| `chkSelect`(진행중 카드 체크박스) | ✅ 완료 | colSelectedForce에 담김. **주의**: colSelectedForce는 `ClearCollect(colSelectedForce, Filter(ReleaseRequest_DB, false))`로 초기화해야 스키마 인식됨(빈 배열 `[]`로 초기화하면 필드 인식 안 됨) |
+| `btnExportCsv` / `conExportPopup` | ⏸️ 보류 | 코드는 작성됐으나(팝업에 CSV 텍스트 표시 후 복사-붙여넣기 방식) Studio 미반영. **Power Automate로 실제 파일 다운로드 vs 지금의 복사-붙여넣기 방식 vs SharePoint에서 수동 export, 방식 결정 필요** |
 
 ---
 
