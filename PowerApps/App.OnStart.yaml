@@ -1,0 +1,26 @@
+// =============================
+// [릴리즈 상태 요청 시스템] App.OnStart
+// 앱 전역 상수 설정. 사용자별 정보는 Screen.OnVisible에서 초기화
+// =============================
+
+// DX팀 담당자 목록 (요청 메일 수신 대상 + DX 권한 판별용)
+ClearCollect(
+    colDxTeam,
+    {DxEmail: "bongjin.kim@tym.world", DxName: "김봉진"},
+    {DxEmail: "inho.choi@tym.world", DxName: "최인호"}
+);
+
+// DX팀 메일 수신용 (SendEmailV2 To 필드에 세미콜론 구분으로 사용)
+Set(varDxRecipients, Concat(colDxTeam, DxEmail, ";"));
+
+// 도면종류 선택지 (다중선택 콤보박스용)
+ClearCollect(
+    colDrawingTypeChoices,
+    {Value: "3D"},
+    {Value: "2D"},
+    {Value: "WTPart"}
+);
+
+// 데이터소스 새로고침 (앱 시작 시 1회)
+Refresh(ReleaseRequest_DB);
+Refresh(UserInfo_DB);
