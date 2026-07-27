@@ -238,9 +238,21 @@ Screens:
                   IconStyle: ='ButtonCanvas.IconStyle'.Filled
                   Layout: ='ButtonCanvas.Layout'.IconBefore
                   OnSelect: |-
-                    =Set(varRequestMode, "New");
+                    =// =============================
+                    // 신규 릴리즈 상태 변경 요청 등록 모드 시작
+                    // =============================
+                    Set(varRequestMode, "New");
+
+                    // 신규 등록용 기본 레코드 지정
                     Set(varSelectedRequest, Defaults(ReleaseRequest_DB));
+
+                    // 품번 입력칸 초기화 - 칸 1개(필수)로 시작, "+"로 최대 8개까지 늘어남
+                    ClearCollect(colPartNoInputs, {Idx: 1, PartNoText: ""});
+
+                    // 신규 폼 모드로 전환
                     NewForm(frmRequest);
+
+                    // 팝업 열기
                     Set(varShowRequestPopup, true);
                   Text: ="요청 등록"
                   VerticalAlign: =VerticalAlign.Middle
@@ -838,7 +850,6 @@ Screens:
             PressedFill: =RGBA(0, 0, 0, 0)
             Visible: =varShowRequestPopup
             Width: =1369
-            X: =-1
       - conRequestPopup:
           Control: GroupContainer@1.5.0
           Variant: ManualLayout
@@ -1273,7 +1284,7 @@ Screens:
                       Properties:
                         BorderColor: =RGBA(243, 242, 241, 1)
                         DataSource: =ReleaseRequest_DB
-                        Height: =597
+                        Height: =300
                         Item: =varSelectedRequest
                         NumberOfColumns: =2
                         OnSuccess: |-
@@ -1286,7 +1297,7 @@ Screens:
                               ReleaseRequest_DB,
                               Self.LastSubmit,
                               {
-                                  Title: Self.LastSubmit.PartNo,
+                                  제목: Self.LastSubmit.PartNo,
                                   RequesterName: varMyName,
                                   RequesterTeam: varMyTeam,
                                   RequesterEmail: varMyEmail,
@@ -1323,7 +1334,7 @@ Screens:
                           Set(varShowToast, true);
                         Width: =751
                         X: =135
-                        Y: =10
+                        Y: =160
                       Children:
                         - PartNo_DataCard1:
                             Control: TypedDataCard@1.0.7
@@ -1333,8 +1344,8 @@ Screens:
                               BorderColor: =RGBA(243, 242, 241, 1)
                               DataField: ="PartNo"
                               Default: =ThisItem.PartNo
-                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'PartNo')
-                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, 'PartNo')
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,PartNo)
+                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, PartNo)
                               Required: =true
                               Update: =DataCardValue1.Value
                               X: =0
@@ -1392,7 +1403,7 @@ Screens:
                               BorderColor: =RGBA(243, 242, 241, 1)
                               DataField: ="DrawingType"
                               Default: =ThisItem.DrawingType
-                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'DrawingType')
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,DrawingType)
                               Required: =true
                               Update: =DataCardValue2.SelectedItems
                               X: =0
@@ -1416,7 +1427,7 @@ Screens:
                                     AccessibleLabel: =Parent.DisplayName
                                     DefaultSelectedItems: =Parent.Default
                                     DisplayMode: =Parent.DisplayMode
-                                    Items: =Choices([@ReleaseRequest_DB].'DrawingType')
+                                    Items: =Choices([@ReleaseRequest_DB].DrawingType)
                                     Required: =Parent.Required
                                     SelectMultiple: =true
                                     ValidationState: =If(IsBlank(Parent.Error), "None", "Error")
@@ -1451,8 +1462,8 @@ Screens:
                               BorderColor: =RGBA(243, 242, 241, 1)
                               DataField: ="Note"
                               Default: =ThisItem.Note
-                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,'Note')
-                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, 'Note')
+                              DisplayName: =DataSourceInfo([@ReleaseRequest_DB],DataSourceInfo.DisplayName,Note)
+                              MaxLength: =DataSourceInfo([@ReleaseRequest_DB], DataSourceInfo.MaxLength, Note)
                               Required: =false
                               Update: =DataCardValue4.Value
                               X: =0
@@ -1530,6 +1541,84 @@ Screens:
                         Visible: =varRequestMode = "New" || varRequestMode = "Edit"
                         X: =732
                         Y: =540
+                  - conPartNoInputs:
+                      Control: GroupContainer@1.5.0
+                      Variant: ManualLayout
+                      Properties:
+                        Height: =140
+                        Width: =751
+                        X: =135
+                        Y: =10
+                      Children:
+                        - galPartNoInputs:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_pcfCore
+                            Properties:
+                              BorderColor: =RGBA(243, 242, 241, 1)
+                              FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                              FocusedBorderThickness: =2
+                              Height: =140
+                              X: =40
+                            Children:
+                              - Rectangle3:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    BorderColor: =RGBA(243, 242, 241, 1)
+                                    DisabledFill: =RGBA(0,0,0,0)
+                                    Fill: =RGBA(0,0,0,0)
+                                    FocusedBorderColor: =RGBA(98, 100, 167, 1)
+                                    Height: =Parent.TemplateHeight
+                                    HoverFill: =RGBA(0,0,0,0)
+                                    OnSelect: =Select(Parent)
+                                    PressedFill: =RGBA(0,0,0,0)
+                                    TabIndex: =0
+                                    Width: =Parent.TemplateWidth
+                              - Image1:
+                                  Control: Image@2.2.3
+                                  Properties:
+                                    BorderColor: =RGBA(0, 0, 0, 0)
+                                    BorderStyle: =BorderStyle.None
+                                    BorderThickness: =2
+                                    DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                                    DisabledFill: =RGBA(0, 0, 0, 0)
+                                    Height: =28
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    OnSelect: =Select(Parent)
+                                    PressedBorderColor: =RGBA(0, 0, 0, 0)
+                                    PressedFill: =RGBA(0, 0, 0, 0)
+                                    RadiusBottomLeft: =3
+                                    RadiusBottomRight: =3
+                                    RadiusTopLeft: =3
+                                    RadiusTopRight: =3
+                                    Width: =28
+                                    X: =12
+                                    Y: =(Parent.TemplateHeight / 2) - (Self.Height / 2)
+                              - Title1:
+                                  Control: FluentV8/Label@1.8.6
+                                  Properties:
+                                    FontWeight: =FontWeight.Semibold
+                                    Height: =24
+                                    OnSelect: =Select(Parent)
+                                    TabIndex: =-1
+                                    Text: =ThisItem.SampleHeading
+                                    VerticalAlignment: =VerticalAlign.Top
+                                    Width: =Parent.TemplateWidth - Self.X - 8
+                                    X: =Image1.X + Image1.Width + 12
+                                    Y: =((Parent.TemplateHeight - 36) / 2) - 4
+                              - Subtitle1:
+                                  Control: FluentV8/Label@1.8.6
+                                  Properties:
+                                    FontSize: =9
+                                    FontWeight: =FontWeight.Normal
+                                    Height: =24
+                                    OnSelect: =Select(Parent)
+                                    TabIndex: =-1
+                                    Text: =ThisItem.SampleText
+                                    VerticalAlignment: =VerticalAlign.Top
+                                    Width: =Title1.Width
+                                    X: =Title1.X
+                                    Y: =Title1.Y + Title1.Height - 6
             - Container2:
                 Control: GroupContainer@1.5.0
                 Variant: ManualLayout
