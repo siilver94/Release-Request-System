@@ -1,6 +1,6 @@
 # _README.md — 릴리즈 상태 요청 시스템 구조 명세
 
-> 상태: **핵심 워크플로우 개조 완료**. 요청 등록→진행중→수정완료→작업완료/강제완료까지 전체 사이클 구현됨(필드 편집만 Studio에서 확인 필요). 남음: DX 편의 기능(일괄/선택 강제완료, Export), 이메일 4종 중 나머지 실물 테스트, 3일 리마인드 flow.
+> 상태: **핵심 워크플로우 + 품번 다중입력(최대 8개) + 이메일 4종 + 3일 경과 리마인드 flow 완료**. 요청 등록→진행중→수정완료→작업완료/강제완료까지 전체 사이클 실물 테스트 완료. 남음: UI/UX 정리, Export(보류).
 > 개조가 진행되면 이 문서를 계속 최신화한다 (변경마다 X, 큰 단계 끝날 때 배치로).
 
 ---
@@ -12,8 +12,9 @@
 
 | 컬럼(내부명) | 표시명 | 타입 | 입력주체 | 설명 |
 |---|---|---|---|---|
-| `Title` | 제목 | 단일텍스트 | 자동 | 품번 값 복사(SharePoint 필수 기본컬럼, 검색·정렬용) |
-| `PartNo` | 품번 | 단일텍스트 | 요청자 | **필수**. PLM 품번 |
+| `Title` | 제목 | 단일텍스트 | 자동 | **품번 다중입력 후 콤마로 합친 문자열** (예: "A123, B456"). 카드 제목·검색·이메일에서 공통으로 사용 |
+| `PartNo` | 품번1 | 단일텍스트 | 요청자 | 최소 1개 필수(UI에서 검증) |
+| `PartNo2`~`PartNo8` | 품번2~8 | 단일텍스트 | 요청자(선택) | 등록 화면 "＋ 품번 추가"로 늘어나는 입력칸, 최대 8개. 개별 컬럼은 저장용이며 화면 표시·검색은 전부 `Title` 기준 |
 | `DrawingType` | 도면종류 | 선택(복수 허용) | 요청자 | **필수**. 3D / 2D / WTPart 다중선택 |
 | `RequesterName` | 요청자명 | 단일텍스트 | 자동 | varMyName |
 | `RequesterTeam` | 요청팀 | 단일텍스트 | 자동 | varMyTeam |
@@ -27,6 +28,7 @@
 | `Note` | 비고 | 여러줄텍스트 | 요청자(선택) | 변경 사유 등. 선택 입력 |
 
 > ⚠️ `DrawingType`은 SharePoint에서 **"여러 값 선택 가능"을 반드시 켜야** 함 (안 켜면 Concat 등에서 오류). `Stage`/`Status`/`DrawingType`은 Choice 타입이라 읽을 땐 `.Value`, Patch로 쓸 땐 `{Value: "텍스트"}`로 감싸야 함.
+> ⚠️ 품번은 등록 화면에서 `colPartNoInputs` collection(칸 1개 시작 + "＋"로 최대 8개)으로 입력받고, `frmRequest.OnSuccess`에서 `PartNo`~`PartNo8`에 순서대로 매핑 + 빈칸 제외하고 합쳐서 `Title`에 저장함. **Form 필드에는 품번이 없음** — 별도 커스텀 UI(`conPartNoInputs`)로 관리.
 
 ### 1-2. `UserInfo_DB` (원본 재사용)
 로그인 사용자 조직정보 조회용. 컬럼: `e-mail`, `이름_한글`, `부문`, `팀`, `직급2` 등.
@@ -104,23 +106,24 @@
 |---|---|---|
 | `Container7` / `beforeTask_con` / `galStart` (시작전) | ✅ 삭제 완료 | |
 | `Container8`(진행중), `Container9`(완료) | ✅ 위치 이동 완료 | X: 293 / 657 (필터 우측부터 순서대로) |
-| `galInProgress`, `galCompleted` | ✅ 데이터 바인딩 완료 | `ReleaseRequest_DB` 기준, Stage.Value 필터, Status.Value 배지(요청됨/수정완료/작업완료/강제완료), 품번+도면종류 표시, 3일경과 빨간 강조 |
+| `galInProgress`, `galCompleted` | ✅ 데이터 바인딩 완료 | `ReleaseRequest_DB` 기준, Stage.Value 필터, Status.Value 배지(요청됨/수정완료/작업완료/강제완료), **품번은 `Title`(합쳐진 문자열) 표시 및 검색 대상**, 도면종류 표시, 3일경과 빨간 강조 |
 | `con_searchFilter` | ✅ 개조 완료 | `ddPeriodFilter`(이번주/이번달/날짜선택/전체) + `dpDateFrom`/`dpDateTo`(신규, 날짜선택 모드에서만 표시) + `txtSearch`(품번/요청자 검색) + `tglOnlyOverdue`(기존 tglIncludeCompleted 재활용, "3일 경과 건만"). `tglIncludeRejected`는 삭제 |
 | `new_btn`(헤더 "요청 등록") | ✅ 완료 | `Defaults(ReleaseRequest_DB)` 기준으로 New 모드 시작 |
 | `OuterRactangle`(팝업 바깥 클릭 닫기) | ✅ 완료 | 첨부파일 로직 제거, ReleaseRequest_DB 기준 |
-| `frmRequest`(요청 등록 폼) | ✅ 완료 | DataSource=ReleaseRequest_DB. **필드 구성은 Studio "필드 편집"으로 직접 교체**(품번/도면종류/비고, 필수=품번·도면종류) → 이 파일의 DataCard 자식 노드는 원본(작업의뢰) 그대로라 실제 Studio 상태와 다름(의도된 것). OnSuccess에서 Stage/Status 초기화 + DX팀 메일 발송 |
+| `frmRequest`(요청 등록 폼) | ✅ 완료 | DataSource=ReleaseRequest_DB. Form 필드는 `DrawingType`, `Note` 2개만(품번은 Form 밖 별도 UI로 분리). OnSuccess에서 Stage/Status 초기화 + 품번 8칸 매핑(`PartNo`~`PartNo8`) + `Title` 합산 + DX팀 메일 발송 |
+| `conPartNoInputs`(품번 다중입력, 신규) | ✅ 완료 | `confrmRequest` 안 `frmRequest`와 형제. `colPartNoInputs` collection(칸 1개 시작) + `galPartNoInputs`(갤러리, 칸마다 `txtPartNoInput`+`btnRemovePartNo`) + `btnAddPartNo`(＋, 8개 되면 숨김). `new_btn.OnSelect`에서 매번 1칸으로 초기화 |
 | `btnRequestSave`, `btnRequestCancel` | ✅ 완료 | 필수값 검증은 폼 Required로 위임, SubmitForm만 호출 |
 | `Container5`(등록 팝업 헤더) | ✅ 완료 | 제목 "릴리즈 상태 변경 요청"으로 교체 |
-| `conRequestView`(상세보기), `Container2`(상세보기 헤더) | ✅ 완료 | 요약정보 박스: 팀=RequesterTeam, "희망완료일"→"도면종류". 비고 박스로 단순화. 헤더 배지/제목 Status.Value·PartNo 기준 |
+| `conRequestView`(상세보기), `Container2`(상세보기 헤더) | ✅ 완료 | 요약정보 박스: 팀=RequesterTeam, "희망완료일"→"도면종류". 비고 박스로 단순화. 헤더 배지/제목 Status.Value·**Title**(합쳐진 품번 문자열) 기준 |
 | `Container3_2`(frmRequestAttachmentView, 첨부파일) | ✅ 삭제 완료 | 첨부파일 기능 없음 |
 | `lblRejectReasonTitle` 등 반려 라벨 3종 | ✅ 삭제 완료 | 반려 없음 |
-| `conRequesterAction` (재구성) | ✅ 완료 | 요청자 "작업완료" 버튼. Visible: 본인 요청 && Status=수정완료 |
-| `conDxAction` (신규, conLeaderAction+conWorkerAction 대체) | ✅ 완료 | DX "수정완료"(Status=요청됨일 때만)/"강제완료"(항상) 버튼. Visible: varIsDX && Stage=진행중 |
+| `conRequesterAction` (재구성) | ✅ 완료 | 요청자 "작업완료" 버튼. Visible: 본인 요청 && Status=수정완료. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용 |
+| `conDxAction` (신규, conLeaderAction+conWorkerAction 대체) | ✅ 완료 | DX "수정완료"(Status=요청됨일 때만)/"강제완료"(항상) 버튼. Visible: varIsDX && Stage=진행중. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용 |
 | `OuterRactangle_1`, `conSelfApproveConfirmPopup`, `conDeleteConfirmPopup` | ✅ 삭제 완료 | 트리거 버튼 소실로 죽은 코드였음 (원본의 "의뢰 삭제/대리승인" 기능. 필요시 추후 "요청 취소" 기능으로 재설계 가능) |
-| `conDxHeaderTools`("일괄 강제완료"/"Export" 버튼, 헤더) | ✅ 완료 | Visible=varIsDX. 일괄강제완료: 임시 컬렉션(colBulkOverdue)에 먼저 담고 ForAll+Patch (원본 데이터소스 직접 순회 Patch 불가 이슈로) |
-| `btnSelectedForceComplete`(진행중 헤더 바 안, 체크된 건만 강제완료) | ✅ 완료 | Visible=varIsDX && 선택건수>0 |
+| `conDxHeaderTools`("일괄 강제완료"/"Export" 버튼, 헤더) | ✅ 완료 | Visible=varIsDX. 일괄강제완료: 임시 컬렉션(colBulkOverdue)에 먼저 담고 ForAll+Patch (원본 데이터소스 직접 순회 Patch 불가 이슈로). 메일의 품번은 `req.Title` 사용 |
+| `btnSelectedForceComplete`(진행중 헤더 바 안, 체크된 건만 강제완료) | ✅ 완료 | Visible=varIsDX && 선택건수>0. 메일의 품번은 `req.Title` 사용 |
 | `chkSelect`(진행중 카드 체크박스) | ✅ 완료 | colSelectedForce에 담김. **주의**: colSelectedForce는 `ClearCollect(colSelectedForce, Filter(ReleaseRequest_DB, false))`로 초기화해야 스키마 인식됨(빈 배열 `[]`로 초기화하면 필드 인식 안 됨) |
-| `btnExportCsv` / `conExportPopup` | ⏸️ 보류 | 코드는 작성됐으나(팝업에 CSV 텍스트 표시 후 복사-붙여넣기 방식) Studio 미반영. **Power Automate로 실제 파일 다운로드 vs 지금의 복사-붙여넣기 방식 vs SharePoint에서 수동 export, 방식 결정 필요** |
+| `btnExportCsv` / `conExportPopup` | ⏸️ 보류 | 코드는 작성됐으나(팝업에 CSV 텍스트 표시 후 복사-붙여넣기 방식) Studio 미반영. 품번 컬럼도 `Title` 기준으로 파일엔 수정해놨으나 Studio 미반영(보류 중이라 급하지 않음). **Power Automate로 실제 파일 다운로드 vs 지금의 복사-붙여넣기 방식 vs SharePoint에서 수동 export, 방식 결정 필요** |
 
 ---
 
@@ -137,7 +140,12 @@
 - **선택 강제완료**: 진행중 카드 체크박스로 선택한 건들만 완료 처리
 - 강제완료 시 `Status = 강제완료`, `CompletedAt = Now()`, 요청자 메일
 
-### 5-3. Export
+### 5-3. 품번 다중입력
+- 등록 화면에서 품번 칸 1개로 시작, "＋ 품번 추가"로 최대 8개까지 늘어남 (필수는 1번 칸만)
+- 저장 시 `PartNo`~`PartNo8` 컬럼에 순서대로 저장 + 빈칸 제외하고 콤마로 합쳐 `Title`에 저장
+- 카드 제목/상세화면/검색/이메일 전체는 개별 `PartNo` 컬럼이 아니라 `Title`(합쳐진 문자열) 기준으로 동작
+
+### 5-4. Export
 - 현재 목록을 **CSV**로 다운로드 (앱 내 생성, 조회 확인용)
 
 ---
@@ -150,5 +158,10 @@
 | 3 | 요청자 작업완료 | DX팀 | 요청자 작업완료 확인 |
 | 4 | 강제완료 | 요청자 | 강제완료 처리됨 |
 
-## 7. 별도 flow (앱 외부)
-- **3일 경과 리마인드**: Power Automate 스케줄 flow (매일 반복). `Stage != 완료` & 3일 경과 건에 요청자 리마인드 메일.
+## 7. 별도 flow (앱 외부) — ✅ 완료
+
+- **3일 경과 리마인드**: Power Automate **예약된 클라우드 흐름** `릴리즈요청_3일경과_리마인드` (매일 반복 실행)
+  - 조건: `Status = 수정완료` AND `Stage = 진행중` AND `ModifiedByDXAt`가 3일 이상 지남 (DX가 수정완료 처리했는데 요청자가 오래 미확인한 건만 대상)
+  - 대상 없으면 그냥 종료, 매일 조건 재검사이므로 요청자가 "작업완료" 누르기 전까지 매일 반복 발송됨(별도 "이미 발송함" 체크 없음, 의도된 동작)
+  - 구성: Recurrence(1일) → Initialize variable(`varCutoffDate` = `addDays(utcNow(), -3)`) → SharePoint Get items(Filter Query로 위 조건) → Apply to each → Office 365 Outlook 메일 보내기(V2), 전부 표준 커넥터
+  - 실물 테스트 완료 (2026-07-28)
