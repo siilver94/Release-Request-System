@@ -1,6 +1,6 @@
 # _README.md — 릴리즈 상태 요청 시스템 구조 명세
 
-> 상태: **핵심 워크플로우 + 품번 다중입력(최대 8개) + 이메일 4종 + 3일 경과 리마인드 flow 완료**. 요청 등록→진행중→수정완료→작업완료/강제완료까지 전체 사이클 실물 테스트 완료. 남음: UI/UX 정리, Export(보류).
+> 상태: **1차 최종 개발 완료**. 핵심 워크플로우, 품번 다중입력(최대 8개), 이메일 4종, 3일 경과 리마인드 flow, UI/UX 정리(배지 색상·버튼 강조·여백 정리)까지 전부 실물 테스트 완료. 배포 단계로 전환. 남음: Export(보류, 필요시 재개).
 > 개조가 진행되면 이 문서를 계속 최신화한다 (변경마다 X, 큰 단계 끝날 때 배치로).
 
 ---
@@ -98,7 +98,7 @@
 | 스크린/컴포넌트 | 상태 | 비고 |
 |---|---|---|
 | `App.OnStart.yaml.txt` | ✅ 완료 | colDxTeam, varDxRecipients, colDrawingTypeChoices |
-| `WorkRequest_Screen.yaml.txt` | 개조 중 | → 릴리즈 요청 메인 화면. 추후 파일명 변경 검토 |
+| `WorkRequest_Screen.yaml.txt` | ✅ 1차 최종 완료 | → 릴리즈 요청 메인 화면. **주인이 Studio 실제 코드를 직접 붙여넣어 동기화 예정** — 이 파일 자체는 그 시점까지 직전 작업본 상태로 유지 |
 
 ### 메인 화면 주요 컨트롤 (진행 현황)
 
@@ -106,19 +106,19 @@
 |---|---|---|
 | `Container7` / `beforeTask_con` / `galStart` (시작전) | ✅ 삭제 완료 | |
 | `Container8`(진행중), `Container9`(완료) | ✅ 위치 이동 완료 | X: 293 / 657 (필터 우측부터 순서대로) |
-| `galInProgress`, `galCompleted` | ✅ 데이터 바인딩 완료 | `ReleaseRequest_DB` 기준, Stage.Value 필터, Status.Value 배지(요청됨/수정완료/작업완료/강제완료), **품번은 `Title`(합쳐진 문자열) 표시 및 검색 대상**, 도면종류 표시, 3일경과 빨간 강조 |
-| `con_searchFilter` | ✅ 개조 완료 | `ddPeriodFilter`(이번주/이번달/날짜선택/전체) + `dpDateFrom`/`dpDateTo`(신규, 날짜선택 모드에서만 표시) + `txtSearch`(품번/요청자 검색) + `tglOnlyOverdue`(기존 tglIncludeCompleted 재활용, "3일 경과 건만"). `tglIncludeRejected`는 삭제 |
+| `galInProgress`, `galCompleted` | ✅ 데이터 바인딩 완료 | `ReleaseRequest_DB` 기준, Stage.Value 필터, Status.Value 배지(요청됨/수정완료/작업완료/강제완료), **품번은 `Title`(합쳐진 문자열) 표시 및 검색 대상**, 도면종류 표시, 3일경과 빨간 강조. **배지 색상(Stage_1/Stage_2 BasePaletteColor·FontColor Switch)도 상태별로 구분되도록 수정 완료**(요청됨=주황/수정완료=파랑/작업완료=초록/강제완료=회색) |
+| `con_searchFilter` | ✅ 개조 완료 | `ddPeriodFilter`(이번주/이번달/날짜선택/전체) + `dpDateFrom`/`dpDateTo`(신규, 날짜선택 모드에서만 표시) + `txtSearch`(품번/요청자 검색) + `tglOnlyOverdue`(기존 tglIncludeCompleted 재활용, "3일 경과 건만"). `tglIncludeRejected`는 삭제. Height 637→280으로 축소(내용물 대비 여백 과다 해소) |
 | `new_btn`(헤더 "요청 등록") | ✅ 완료 | `Defaults(ReleaseRequest_DB)` 기준으로 New 모드 시작 |
 | `OuterRactangle`(팝업 바깥 클릭 닫기) | ✅ 완료 | 첨부파일 로직 제거, ReleaseRequest_DB 기준 |
-| `frmRequest`(요청 등록 폼) | ✅ 완료 | DataSource=ReleaseRequest_DB. Form 필드는 `DrawingType`, `Note` 2개만(품번은 Form 밖 별도 UI로 분리). OnSuccess에서 Stage/Status 초기화 + 품번 8칸 매핑(`PartNo`~`PartNo8`) + `Title` 합산 + DX팀 메일 발송 |
-| `conPartNoInputs`(품번 다중입력, 신규) | ✅ 완료 | `confrmRequest` 안 `frmRequest`와 형제. `colPartNoInputs` collection(칸 1개 시작) + `galPartNoInputs`(갤러리, 칸마다 `txtPartNoInput`+`btnRemovePartNo`) + `btnAddPartNo`(＋, 8개 되면 숨김). `new_btn.OnSelect`에서 매번 1칸으로 초기화 |
-| `btnRequestSave`, `btnRequestCancel` | ✅ 완료 | 필수값 검증은 폼 Required로 위임, SubmitForm만 호출 |
+| `frmRequest`(요청 등록 폼) | ✅ 완료 | DataSource=ReleaseRequest_DB. Form 필드는 `DrawingType`, `Note` 2개만(품번은 Form 밖 별도 UI로 분리). OnSuccess에서 Stage/Status 초기화 + 품번 8칸 매핑(`PartNo`~`PartNo8`) + `Title` 합산 + DX팀 메일 발송. Y=125(간격 정리 반영) |
+| `conPartNoInputs`(품번 다중입력, 신규) | ✅ 완료 | `confrmRequest` 안 `frmRequest`와 형제(Height 100, 간격 정리 완료). `colPartNoInputs` collection(칸 1개 시작) + `galPartNoInputs`(갤러리 Height 50, 칸마다 `txtPartNoInput`+`btnRemovePartNo`) + `btnAddPartNo`(＋, 남색 색상 팔레트로 통일, 8개 되면 숨김). `new_btn.OnSelect`에서 매번 1칸으로 초기화 |
+| `btnRequestSave`, `btnRequestCancel` | ✅ 완료 | 품번 1번 칸 필수 검증(`btnRequestSave.OnSelect`에서 직접 체크, SharePoint PartNo 컬럼 필수 해제함) 후 SubmitForm 호출. `btnRequestSave`는 남색 채움(Fill/BorderColor/FontColor) 스타일로 주요 액션 강조, `btnRequestCancel`은 기존 outline 스타일 유지 |
 | `Container5`(등록 팝업 헤더) | ✅ 완료 | 제목 "릴리즈 상태 변경 요청"으로 교체 |
-| `conRequestView`(상세보기), `Container2`(상세보기 헤더) | ✅ 완료 | 요약정보 박스: 팀=RequesterTeam, "희망완료일"→"도면종류". 비고 박스로 단순화. 헤더 배지/제목 Status.Value·**Title**(합쳐진 품번 문자열) 기준 |
+| `conRequestView`(상세보기), `Container2`(상세보기 헤더) | ✅ 완료 | 요약정보 박스: 팀=RequesterTeam, "희망완료일"→"도면종류". 비고 박스로 단순화. 헤더 배지/제목 Status.Value·**Title**(합쳐진 품번 문자열) 기준. 배지(`Stage_3`)는 기존부터 BasePaletteColor+FontColor Switch 완비 상태 |
 | `Container3_2`(frmRequestAttachmentView, 첨부파일) | ✅ 삭제 완료 | 첨부파일 기능 없음 |
 | `lblRejectReasonTitle` 등 반려 라벨 3종 | ✅ 삭제 완료 | 반려 없음 |
-| `conRequesterAction` (재구성) | ✅ 완료 | 요청자 "작업완료" 버튼. Visible: 본인 요청 && Status=수정완료. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용 |
-| `conDxAction` (신규, conLeaderAction+conWorkerAction 대체) | ✅ 완료 | DX "수정완료"(Status=요청됨일 때만)/"강제완료"(항상) 버튼. Visible: varIsDX && Stage=진행중. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용 |
+| `conRequesterAction` (재구성) | ✅ 완료 | 요청자 "작업완료" 버튼. Visible: 본인 요청 && Status=수정완료. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용(누락됐던 1곳 최종 수정 완료). Y=377로 조정(첨부파일 섹션 삭제 후 남은 여백 해소) |
+| `conDxAction` (신규, conLeaderAction+conWorkerAction 대체) | ✅ 완료 | DX "수정완료"(Status=요청됨일 때만)/"강제완료"(**Status=수정완료일 때만**, Visible 조건 추가 완료) 버튼 — 두 버튼이 상태별로 배타적으로 노출됨. Visible(컨테이너): varIsDX && Stage=진행중. 메일 제목/본문 품번은 `varSelectedRequest.Title` 사용. Y=377로 조정 |
 | `OuterRactangle_1`, `conSelfApproveConfirmPopup`, `conDeleteConfirmPopup` | ✅ 삭제 완료 | 트리거 버튼 소실로 죽은 코드였음 (원본의 "의뢰 삭제/대리승인" 기능. 필요시 추후 "요청 취소" 기능으로 재설계 가능) |
 | `conDxHeaderTools`("일괄 강제완료"/"Export" 버튼, 헤더) | ✅ 완료 | Visible=varIsDX. 일괄강제완료: 임시 컬렉션(colBulkOverdue)에 먼저 담고 ForAll+Patch (원본 데이터소스 직접 순회 Patch 불가 이슈로). 메일의 품번은 `req.Title` 사용 |
 | `btnSelectedForceComplete`(진행중 헤더 바 안, 체크된 건만 강제완료) | ✅ 완료 | Visible=varIsDX && 선택건수>0. 메일의 품번은 `req.Title` 사용 |
@@ -148,6 +148,12 @@
 ### 5-4. Export
 - 현재 목록을 **CSV**로 다운로드 (앱 내 생성, 조회 확인용)
 
+### 5-5. UI/UX 정리 — ✅ 완료
+- **상태 배지 색상**: 요청됨=주황, 수정완료=파랑, 작업완료=초록, 강제완료=회색/슬레이트 (BasePaletteColor+FontColor Switch, 카드/상세보기 전부 통일)
+- **주요 버튼 강조**: "등록"(`btnRequestSave`), "＋ 품번 추가"(`btnAddPartNo`)는 남색(`RGBA(27,38,59,1)`) 채움 스타일로 강조. 그 외(취소 등)는 기존 outline 스타일 유지
+- **여백 정리**: `con_searchFilter`(필터 패널) 높이 축소, 품번 입력 갤러리 높이 축소, 상세보기 액션 영역(`conRequesterAction`/`conDxAction`) Y 위치 조정(첨부파일 삭제로 생긴 빈 공간 해소)
+- **폰트**: Verdana 전체 유지 (변경 안 함, 사용자 확인)
+
 ---
 
 ## 6. 이메일 (4종, 앱 내 `Office365Outlook.SendEmailV2`)
@@ -165,3 +171,11 @@
   - 대상 없으면 그냥 종료, 매일 조건 재검사이므로 요청자가 "작업완료" 누르기 전까지 매일 반복 발송됨(별도 "이미 발송함" 체크 없음, 의도된 동작)
   - 구성: Recurrence(1일) → Initialize variable(`varCutoffDate` = `addDays(utcNow(), -3)`) → SharePoint Get items(Filter Query로 위 조건) → Apply to each → Office 365 Outlook 메일 보내기(V2), 전부 표준 커넥터
   - 실물 테스트 완료 (2026-07-28)
+
+---
+
+## 8. 배포
+
+- 1차 최종 개발 완료 (2026-07-30). 오픈 안내 메일 초안: `오픈안내_메일_초안.md` (이 폴더 내). 스크린샷(메인 보드/등록 화면/상세보기) 3곳은 자리표시만 해둠 — 실제 이미지로 교체 필요
+- `WorkRequest_Screen.yaml.txt`는 주인이 Studio 실제 코드를 직접 붙여넣어 최종 동기화할 예정
+- **DB 스키마 최종 검증 완료 (2026-07-30)**: `ReleaseRequest_DB` 실제 SharePoint 리스트 열 목록을 1절 스키마표와 대조 확인 — PartNo 필수 해제, PartNo2~8 생성, DrawingType 다중선택, Stage/Status Choice 값 전부 일치 확인됨
