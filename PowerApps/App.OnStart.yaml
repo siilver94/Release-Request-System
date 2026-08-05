@@ -8,6 +8,7 @@ ClearCollect(
     colDxTeam,
     {DxEmail: "bongjin.kim@tym.world", DxName: "김봉진"},
     {DxEmail: "inho.choi@tym.world", DxName: "최인호"}
+   // {DxEmail: "eunseong.kim@tym.world", DxName: "김은성"}
 );
 
 // DX팀 메일 수신용 (SendEmailV2 To 필드에 세미콜론 구분으로 사용)
